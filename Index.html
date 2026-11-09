@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MARUF Animation Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Hind+Siliguri:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f3ff;--ink:#1f1b3a;--card:#fff;--line:#d9d4f5;--accent:#ff5d73;--accent-ink:#fff;--muted:#625d85}
+@media (prefers-color-scheme:dark){:root{--bg:#17142b;--ink:#f1eeff;--card:#221e3d;--line:#3a3562;--muted:#a9a3d1}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Hind Siliguri",system-ui,sans-serif;padding:16px}
+main{max-width:720px;margin:0 auto}
+h1{font:700 28px/1.2 Fredoka,sans-serif;margin:8px 0 4px}
+h2{font:500 20px Fredoka,sans-serif;margin:24px 0 8px}
+p.sub{margin:0 0 16px;color:var(--muted)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+label{display:block;font-weight:600;margin:12px 0 4px}
+textarea,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+textarea{min-height:120px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:480px){.row{grid-template-columns:1fr}}
+button{margin-top:16px;width:100%;padding:12px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font:600 17px "Hind Siliguri",sans-serif;cursor:pointer}
+button:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.note{margin-top:12px;padding:10px 12px;border-left:4px solid #ffc857;background:var(--bg);border-radius:6px;font-size:14px}
+.error{color:#d62839;font-weight:600;margin-top:8px}
+#board{display:grid;gap:12px}
+.frame{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.pic{display:flex;align-items:center;justify-content:center;color:#fff;font:700 22px Fredoka,sans-serif;width:100%}
+.cap{padding:10px 12px}
+.cap small{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <h1>MARUF Animation Studio</h1>
+  <p class="sub">আপনার গল্প লিখুন, স্টোরিবোর্ড তৈরি হবে।</p>
+
+  <section class="panel">
+    <label for="story">Story or idea</label>
+    <textarea id="story" placeholder="একটা ছোট্ট মেঘ বৃষ্টি হতে ভয় পেত। একদিন সে এক কৃষকের মাঠ দেখল। মাঠ শুকিয়ে গেছে। মেঘ সাহস করে বৃষ্টি হলো।"></textarea>
+    <div class="row">
+      <div><label for="style">Animation style</label>
+        <select id="style"><option value="#ff5d73">Cartoon</option><option value="#1fa7a0">2D flat</option><option value="#7c5cff">3D</option><option value="#e08a1e">Anime</option><option value="#4d6a8f">Whiteboard</option></select></div>
+      <div><label for="dur">Duration</label>
+        <select id="dur"><option value="30">30 seconds</option><option value="60" selected>1 minute</option><option value="120">2 minutes</option></select></div>
+      <div><label for="lang">Language</label>
+        <select id="lang"><option>বাংলা</option><option>English</option><option>हिन्दी</option></select></div>
+      <div><label for="ratio">Aspect ratio</label>
+        <select id="ratio"><option value="16/9">16:9 (YouTube)</option><option value="9/16">9:16 (Reels, Shorts)</option><option value="1/1">1:1 (Square)</option></select></div>
+    </div>
+    <button id="go" type="button">Create storyboard</button>
+    <div id="err" class="error" role="alert"></div>
+    <div class="note">Demo mode: এখনো AI যুক্ত হয়নি। এই স্টোরিবোর্ড আপনার লেখাকে শুধু দৃশ্যে ভাগ করে। AI পরে যুক্ত হবে।</div>
+  </section>
+
+  <h2 id="bt" hidden>Storyboard</h2>
+  <div id="board" aria-live="polite"></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function splitScenes(text, count) {
+  const parts = text.split(/(?<=[.!?।])\s+|\n+/).map(s => s.trim()).filter(Boolean);
+  if (parts.length <= count) return parts;
+  const per = Math.ceil(parts.length / count), out = [];
+  for (let i = 0; i < parts.length; i += per) out.push(parts.slice(i, i + per).join(" "));
+  return out;
+}
+
+$("go").addEventListener("click", () => {
+  const story = $("story").value.trim();
+  $("err").textContent = "";
+  if (story.length < 10) {
+    $("err").textContent = "গল্প বা আইডিয়া একটু বড় করে লিখুন (কমপক্ষে ১০ অক্ষর)।";
+    return;
+  }
+  const total = Number($("dur").value);
+  const maxScenes = Math.max(3, Math.round(total / 10));
+  const scenes = splitScenes(story, maxScenes);
+  const each = Math.round(total / scenes.length);
+  const color = $("style").value, ratio = $("ratio").value;
+  const portrait = ratio === "9/16";
+
+  const board = $("board");
+  board.innerHTML = "";
+  board.style.gridTemplateColumns = portrait ? "repeat(auto-fill,minmax(150px,1fr))" : "1fr";
+
+  scenes.forEach((text, i) => {
+    const f = document.createElement("div");
+    f.className = "frame";
+    const pic = document.createElement("div");
+    pic.className = "pic";
+    pic.style.background = color;
+    pic.style.aspectRatio = ratio;
+    pic.textContent = "Scene " + (i + 1);
+    const cap = document.createElement("div");
+    cap.className = "cap";
+    cap.textContent = text;
+    const t = document.createElement("small");
+    t.textContent = " (" + each + "s)";
+    cap.appendChild(t);
+    f.append(pic, cap);
+    board.appendChild(f);
+  });
+  $("bt").hidden = false;
+  $("bt").scrollIntoView({ behavior: "smooth" });
+});
+</script>
+</body>
+</html>
